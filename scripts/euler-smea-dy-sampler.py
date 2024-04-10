@@ -101,3 +101,4 @@ if not NAME in [x.name for x in sd_samplers.all_samplers]:
     ]
     sd_samplers.all_samplers += samplers_data_euler_smea_samplers
     sd_samplers.all_samplers_map = {x.name: x for x in sd_samplers.all_samplers}
+    sd_samplers.set_samplers()
