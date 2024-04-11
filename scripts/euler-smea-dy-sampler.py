@@ -6,15 +6,59 @@ from tqdm.auto import trange, tqdm
 from k_diffusion import utils
 from k_diffusion.sampling import to_d
 import math
+from importlib import import_module
 
 NAME = 'Euler_Smea_Dy'
 ALIAS = 'euler_smea_dy'
 
 
+sampling = None
+BACKEND = None
+INITIALIZED = False
+
+if not BACKEND:
+    try:
+        sampling = import_module("k_diffusion.sampling")
+        BACKEND = "WebUI"
+    except ImportError:
+        pass
+
+if not BACKEND:
+    try:
+        sampling = import_module("ldm_patched.k_diffusion.sampling")
+        BACKEND = "Forge"
+    except ImportError:
+        pass
+
+
+class _Rescaler:
+    def __init__(self, model, x, mode, **extra_args):
+        self.model = model
+        self.x = x
+        self.mode = mode
+        self.extra_args = extra_args
+        if BACKEND in ["WebUI", "Forge"]:
+            self.init_latent, self.mask, self.nmask = model.init_latent, model.mask, model.nmask
+
+    def __enter__(self):
+        if BACKEND in ["WebUI", "Forge"]:
+            if self.init_latent is not None:
+                self.model.init_latent = torch.nn.functional.interpolate(input=self.init_latent, size=self.x.shape[2:4], mode=self.mode)
+            if self.mask is not None:
+                self.model.mask = torch.nn.functional.interpolate(input=self.mask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
+            if self.nmask is not None:
+                self.model.nmask = torch.nn.functional.interpolate(input=self.nmask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
+
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if BACKEND in ["WebUI", "Forge"]:
+            del self.model.init_latent, self.model.mask, self.model.nmask
+            self.model.init_latent, self.model.mask, self.model.nmask = self.init_latent, self.mask, self.nmask
+
 
 @torch.no_grad()
 def dy_sampling_step(x, model, dt, sigma_hat, **extra_args):
-
     original_shape = x.shape
     batch_size, m, n = original_shape[0], original_shape[2] // 2, original_shape[3] // 2
     extra_row = x.shape[2] % 2 == 1
@@ -30,15 +74,10 @@ def dy_sampling_step(x, model, dt, sigma_hat, **extra_args):
     a_list = x.unfold(2, 2, 2).unfold(3, 2, 2).contiguous().view(batch_size, 4, m * n, 2, 2)
     c = a_list[:, :, :, 1, 1].view(batch_size, 4, m, n)
 
-    # Please note that this is just a temporary solution and doesn't actually resolve the issue.
-    try:
-        # print('test before denoised')
-        denoised = model(c, sigma_hat * c.new_ones([c.shape[0]]), **extra_args)
-        d = to_d(c, sigma_hat, denoised)
-        c = c + d * dt
-    except Exception as e:
-        # print('can not denoised. Using original Euler method.')
-        return x
+    with _Rescaler(model, c, 'nearest-exact', **extra_args) as rescaler:
+        denoised = model(c, sigma_hat * c.new_ones([c.shape[0]]), **rescaler.extra_args)
+    d = sampling.to_d(c, sigma_hat, denoised)
+    c = c + d * dt
 
     d_list = c.view(batch_size, 4, m * n, 1, 1)
     a_list[:, :, :, 1, 1] = d_list[:, :, :, 0, 0]
@@ -61,13 +100,12 @@ def dy_sampling_step(x, model, dt, sigma_hat, **extra_args):
 @torch.no_grad()
 def smea_sampling_step(x, model, dt, sigma_hat, **extra_args):
     m, n = x.shape[2], x.shape[3]
-    x = torch.nn.functional.interpolate(input=x, size=None, scale_factor=(1.25, 1.25), mode='nearest',
-                                    align_corners=None,recompute_scale_factor=None)
-    denoised = model(x, sigma_hat * x.new_ones([x.shape[0]]), **extra_args)
-    d = to_d(x, sigma_hat, denoised)
+    x = torch.nn.functional.interpolate(input=x, scale_factor=(1.25, 1.25), mode='nearest-exact')
+    with _Rescaler(model, x, 'nearest-exact', **extra_args) as rescaler:
+        denoised = model(x, sigma_hat * x.new_ones([x.shape[0]]), **rescaler.extra_args)
+    d = sampling.to_d(x, sigma_hat, denoised)
     x = x + d * dt
-    x = torch.nn.functional.interpolate(input=x, size=(m,n), scale_factor=None, mode='nearest',
-                                        align_corners=None, recompute_scale_factor=None)
+    x = torch.nn.functional.interpolate(input=x, size=(m,n), mode='nearest-exact')
     return x
 
 
@@ -84,7 +122,7 @@ def sample_euler_smea_dy(model, x, sigmas, extra_args=None, callback=None, disab
         if gamma > 0:
             x = x - eps * (sigma_hat ** 2 - sigmas[i] ** 2) ** 0.5
         denoised = model(x, sigma_hat * s_in, **extra_args)
-        d = to_d(x, sigma_hat, denoised)
+        d = sampling.to_d(x, sigma_hat, denoised)
         # Euler method
         x = x + d * dt
         if sigmas[i + 1] > 0:
