@@ -8,28 +8,13 @@ from k_diffusion.sampling import to_d
 import math
 from importlib import import_module
 
+sampling = import_module("k_diffusion.sampling")
 NAME = 'Euler_Dy'
 ALIAS = 'euler_dy'
 
 
-sampling = None
-BACKEND = None
-INITIALIZED = False
 
-if not BACKEND:
-    try:
-        sampling = import_module("k_diffusion.sampling")
-        BACKEND = "WebUI"
-    except ImportError:
-        pass
-
-if not BACKEND:
-    try:
-        sampling = import_module("ldm_patched.k_diffusion.sampling")
-        BACKEND = "Forge"
-    except ImportError:
-        pass
-
+# sampler
 
 class _Rescaler:
     def __init__(self, model, x, mode, **extra_args):
@@ -37,24 +22,21 @@ class _Rescaler:
         self.x = x
         self.mode = mode
         self.extra_args = extra_args
-        if BACKEND in ["WebUI", "Forge"]:
-            self.init_latent, self.mask, self.nmask = model.init_latent, model.mask, model.nmask
+        self.init_latent, self.mask, self.nmask = model.init_latent, model.mask, model.nmask
 
     def __enter__(self):
-        if BACKEND in ["WebUI", "Forge"]:
-            if self.init_latent is not None:
-                self.model.init_latent = torch.nn.functional.interpolate(input=self.init_latent, size=self.x.shape[2:4], mode=self.mode)
-            if self.mask is not None:
-                self.model.mask = torch.nn.functional.interpolate(input=self.mask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
-            if self.nmask is not None:
-                self.model.nmask = torch.nn.functional.interpolate(input=self.nmask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
+        if self.init_latent is not None:
+            self.model.init_latent = torch.nn.functional.interpolate(input=self.init_latent, size=self.x.shape[2:4], mode=self.mode)
+        if self.mask is not None:
+            self.model.mask = torch.nn.functional.interpolate(input=self.mask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
+        if self.nmask is not None:
+            self.model.nmask = torch.nn.functional.interpolate(input=self.nmask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
 
         return self
 
     def __exit__(self, type, value, traceback):
-        if BACKEND in ["WebUI", "Forge"]:
-            del self.model.init_latent, self.model.mask, self.model.nmask
-            self.model.init_latent, self.model.mask, self.model.nmask = self.init_latent, self.mask, self.nmask
+        del self.model.init_latent, self.model.mask, self.model.nmask
+        self.model.init_latent, self.model.mask, self.model.nmask = self.init_latent, self.mask, self.nmask
 
 
 @torch.no_grad()
@@ -125,6 +107,7 @@ def sample_euler_dy(model, x, sigmas, extra_args=None, callback=None, disable=No
 
 
 
+# add sampler
 if not NAME in [x.name for x in sd_samplers.all_samplers]:
     euler_max_samplers = [(NAME, sample_euler_dy, [ALIAS], {})]
     samplers_data_euler_max_samplers = [
