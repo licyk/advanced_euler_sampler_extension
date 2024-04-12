@@ -1,7 +1,26 @@
 # advance_eular_sampler_extension
+## 目录
+- [advance\_eular\_sampler\_extension](#advance_eular_sampler_extension)
+  - [目录](#目录)
+  - [介绍](#介绍)
+  - [效果展示](#效果展示)
+  - [安装](#安装)
+    - [通过命令安装](#通过命令安装)
+    - [通过 stable-diffusion-webui 安装](#通过-stable-diffusion-webui-安装)
+    - [通过绘世启动器安装](#通过绘世启动器安装)
+  - [使用](#使用)
+  - [鸣谢](#鸣谢)
+
+
+## 介绍
 一个为 [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 添加 Eular Smea 采样算法的扩展
 
 采样器源码：[Euler-Smea-Dyn-Sampler](https://github.com/Koishi-Star/Euler-Smea-Dyn-Sampler)
+
+## 效果展示
+以下是使用 [EX2-K](https://civitai.com/models/161977/ex2-k) 模型进行测试的结果：  
+![img1](img/xyz_grid-0000-114514.jpg)  
+推荐搭配该模型进行使用，下载地址：[EX2-K - SSE2 | Stable Diffusion Checkpoint | Civitai](https://civitai.com/models/161977/ex2-k)
 
 ## 安装
 ### 通过命令安装
