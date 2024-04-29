@@ -53,3 +53,4 @@ https://github.com/licyk/advanced_euler_sampler_extension
 
 ## 鸣谢
 [Koishi-Star](https://github.com/Koishi-Star)：提供 Eular Smea 采样算法
+[ananosleep](https://github.com/ananosleep)：提供为 SD WebUI 添加采样算法的方法
