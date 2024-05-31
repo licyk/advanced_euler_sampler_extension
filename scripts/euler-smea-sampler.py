@@ -14,7 +14,7 @@ def overall_sampling_step(x, model, dt, sigma_hat, **extra_args):
     # 先判断输入的形状类型
     original_shape = x.shape
     # 计算m和n
-    m, n = original_shape[2] // 2, original_shape[3] // 2
+    batch_size, channels, m, n = original_shape[0], original_shape[1], original_shape[2] // 2, original_shape[3] // 2
     extra_row = x.shape[2] % 2 == 1
     extra_col = x.shape[3] % 2 == 1
 
@@ -31,16 +31,16 @@ def overall_sampling_step(x, model, dt, sigma_hat, **extra_args):
         # print(x0.shape)
 
     # 之前的处理逻辑
-    a_list = x.unfold(2, 2, 2).unfold(3, 2, 2).contiguous().view(1, 4, m * n, 2, 2)
-    c = a_list[:, :, :, 1, 1].view(1, 4, m, n)
+    a_list = x.unfold(2, 2, 2).unfold(3, 2, 2).contiguous().view(batch_size, channels, m * n, 2, 2)
+    c = a_list[:, :, :, 1, 1].view(batch_size, channels, m, n)
 
     denoised = model(c, sigma_hat * c.new_ones([c.shape[0]]), **extra_args)
     d = k_diffusion.sampling.to_d(c, sigma_hat, denoised)
     c = c + d * dt
 
-    d_list = denoised.view(1, 4, m * n, 1, 1)
+    d_list = denoised.view(batch_size, channels, m * n, 1, 1)
     a_list[:, :, :, 1, 1] = d_list[:, :, :, 0, 0]
-    x = a_list.view(1, 4, m, n, 2, 2).permute(0, 1, 2, 4, 3, 5).reshape(1, 4, 2 * m, 2 * n)
+    x = a_list.view(batch_size, channels, m, n, 2, 2).permute(0, 1, 2, 4, 3, 5).reshape(batch_size, channels, 2 * m, 2 * n)
     # print("成功整体采样")
     # print(x1.shape)
 
