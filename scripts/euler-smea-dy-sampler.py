@@ -120,12 +120,12 @@ def sample_euler_smea_dy(model, x, sigmas, extra_args=None, callback=None, disab
 
 # add sampler
 if not NAME in [x.name for x in sd_samplers.all_samplers]:
-    euler_smea_samplers = [(NAME, sample_euler_smea_dy, [ALIAS], {})]
-    samplers_data_euler_smea_samplers = [
+    new_samplers = [(NAME, sample_euler_smea_dy, [ALIAS], {})]
+    new_samplers_data = [
         sd_samplers_common.SamplerData(label, lambda model, funcname=funcname: sd_samplers_kdiffusion.KDiffusionSampler(funcname, model), aliases, options)
-        for label, funcname, aliases, options in euler_smea_samplers
+        for label, funcname, aliases, options in new_samplers
         if callable(funcname) or hasattr(k_diffusion.sampling, funcname)
     ]
-    sd_samplers.all_samplers += samplers_data_euler_smea_samplers
+    sd_samplers.all_samplers += new_samplers_data
     sd_samplers.all_samplers_map = {x.name: x for x in sd_samplers.all_samplers}
     sd_samplers.set_samplers()
