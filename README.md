@@ -15,7 +15,7 @@
 ## 介绍
 一个为 [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 添加 Eular Smea 采样算法的扩展
 
-采样器源码：[Euler-Smea-Dyn-Sampler](https://github.com/Koishi-Star/Euler-Smea-Dyn-Sampler)
+采样器源码：[Euler-Smea-Dyn-Sampler](https://github.com/Koishi-Star/Euler-Smea-Dyn-Sampler)、[Pyramid_Noise_For_Inference](https://github.com/Koishi-Star/Pyramid_Noise_For_Inference)
 
 ## 效果展示
 以下是使用 [EX2-K](https://civitai.com/models/161977/ex2-k) 模型进行测试的结果：  
