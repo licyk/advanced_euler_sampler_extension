@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import k_diffusion.sampling as k_sampling
+import comfy.k_diffusion.sampling as comfy_k_sampling
 import comfy.samplers
 
 ROOT = Path(__file__).resolve().parent
@@ -64,7 +65,10 @@ def _register_samplers() -> list[str]:
         if not name or not alias or sample_fn is None:
             continue
 
-        setattr(k_sampling, alias, sample_fn)
+        fn_name = sample_fn.__name__
+        # ComfyUI resolves samplers via comfy.k_diffusion.sampling.sample_<sampler_name>
+        setattr(k_sampling, fn_name, sample_fn)
+        setattr(comfy_k_sampling, fn_name, sample_fn)
 
         if alias not in comfy.samplers.KSampler.SAMPLERS:
             comfy.samplers.KSampler.SAMPLERS.append(alias)
