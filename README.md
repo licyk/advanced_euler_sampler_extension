@@ -26,7 +26,7 @@ cd ComfyUI/custom_nodes
 2. Clone this repository:
 
 ```bash
-git clone https://github.com/licyk/Comfyui_advanced_euler_sampler_extension
+git clone https://github.com/azazeal04/Comfyui_advanced_euler_sampler_extension
 ```
 
 3. Restart ComfyUI.
