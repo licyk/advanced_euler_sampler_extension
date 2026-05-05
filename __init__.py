@@ -24,6 +24,20 @@ SCRIPT_FILES = [
 ]
 
 
+FALLBACK_ALIAS_TO_FUNC = {
+    "euler_negative": "sample_euler_negative",
+    "euler_dy": "sample_euler_dy",
+    "euler_dy_negative": "sample_euler_dy_negative",
+    "euler_max": "sample_euler_max",
+    "euler_smea": "sample_euler_smea",
+    "euler_smea_dy": "sample_euler_smea_dy",
+    "kohaku_lonyu_yog": "sample_Kohaku_LoNyu_Yog",
+    "k_euler_pyramid": "sample_euler_pyramid",
+    "k_heun_pyramid": "sample_heun_pyramid",
+    "k_dpmpp_2s_pyramid": "sample_dpmpp_2s_pyramid",
+}
+
+
 def _strip_a1111_bits(source: str) -> str:
     cutoff_tokens = [
         "\n# add sampler",
@@ -42,6 +56,45 @@ def _strip_a1111_bits(source: str) -> str:
     return "\n".join(lines)
 
 
+
+
+def _patch_rescaler(ns: dict) -> None:
+    cls = ns.get("_Rescaler")
+    if cls is None:
+        return
+
+    class SafeRescaler(cls):
+        def __init__(self, model, x, mode, **extra_args):
+            self.model = model
+            self.x = x
+            self.mode = mode
+            self.extra_args = extra_args
+            self._had_init_latent = hasattr(model, "init_latent")
+            self._had_mask = hasattr(model, "mask")
+            self._had_nmask = hasattr(model, "nmask")
+            self.init_latent = getattr(model, "init_latent", None)
+            self.mask = getattr(model, "mask", None)
+            self.nmask = getattr(model, "nmask", None)
+
+        def __enter__(self):
+            if self.init_latent is not None and self._had_init_latent:
+                self.model.init_latent = __import__("torch").nn.functional.interpolate(input=self.init_latent, size=self.x.shape[2:4], mode=self.mode)
+            if self.mask is not None and self._had_mask:
+                self.model.mask = __import__("torch").nn.functional.interpolate(input=self.mask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
+            if self.nmask is not None and self._had_nmask:
+                self.model.nmask = __import__("torch").nn.functional.interpolate(input=self.nmask.unsqueeze(0), size=self.x.shape[2:4], mode=self.mode).squeeze(0)
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if self._had_init_latent:
+                self.model.init_latent = self.init_latent
+            if self._had_mask:
+                self.model.mask = self.mask
+            if self._had_nmask:
+                self.model.nmask = self.nmask
+
+    ns["_Rescaler"] = SafeRescaler
+
 def _load_sampler_namespace(path: Path) -> dict:
     source = path.read_text(encoding="utf-8")
     source = _strip_a1111_bits(source)
@@ -50,6 +103,7 @@ def _load_sampler_namespace(path: Path) -> dict:
         "__file__": str(path),
     }
     exec(source, namespace, namespace)
+    _patch_rescaler(namespace)
     return namespace
 
 
@@ -66,13 +120,28 @@ def _register_samplers() -> list[str]:
             continue
 
         fn_name = sample_fn.__name__
+        alias_fn_name = f"sample_{alias}"
         # ComfyUI resolves samplers via comfy.k_diffusion.sampling.sample_<sampler_name>
         setattr(k_sampling, fn_name, sample_fn)
         setattr(comfy_k_sampling, fn_name, sample_fn)
+        # Also expose alias-based name for non-standard function naming (e.g. Kohaku_LoNyu_Yog)
+        setattr(k_sampling, alias_fn_name, sample_fn)
+        setattr(comfy_k_sampling, alias_fn_name, sample_fn)
 
         if alias not in comfy.samplers.KSampler.SAMPLERS:
             comfy.samplers.KSampler.SAMPLERS.append(alias)
         registered.append(alias)
+
+    # Ensure alias-based symbols always exist (including non-matching function names).
+    for alias, fn_name in FALLBACK_ALIAS_TO_FUNC.items():
+        target = getattr(comfy_k_sampling, fn_name, None) or getattr(k_sampling, fn_name, None)
+        if callable(target):
+            setattr(k_sampling, f"sample_{alias}", target)
+            setattr(comfy_k_sampling, f"sample_{alias}", target)
+            if alias not in comfy.samplers.KSampler.SAMPLERS:
+                comfy.samplers.KSampler.SAMPLERS.append(alias)
+            if alias not in registered:
+                registered.append(alias)
 
     return registered
 
