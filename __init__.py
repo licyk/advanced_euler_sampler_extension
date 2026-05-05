@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import types
 import k_diffusion.sampling as k_sampling
 import comfy.samplers
 
@@ -24,24 +23,32 @@ SCRIPT_FILES = [
 ]
 
 
-def _load_sampler_namespace(path: Path) -> dict:
-    source = path.read_text(encoding="utf-8")
-    lines: list[str] = []
-    skip_tail = False
+def _strip_a1111_bits(source: str) -> str:
+    cutoff_tokens = [
+        "\n# add sampler",
+        "\nif not NAME in [x.name for x in sd_samplers.all_samplers]:",
+    ]
+
+    cut_positions = [source.find(token) for token in cutoff_tokens if source.find(token) != -1]
+    if cut_positions:
+        source = source[: min(cut_positions)]
+
+    lines = []
     for line in source.splitlines():
-        if line.strip().startswith("# add sampler"):
-            skip_tail = True
-        if skip_tail:
-            continue
         if "from modules import" in line:
             continue
         lines.append(line)
+    return "\n".join(lines)
 
+
+def _load_sampler_namespace(path: Path) -> dict:
+    source = path.read_text(encoding="utf-8")
+    source = _strip_a1111_bits(source)
     namespace = {
         "__name__": f"comfy_dynamic_{path.stem.replace('-', '_')}",
         "__file__": str(path),
     }
-    exec("\n".join(lines), namespace, namespace)
+    exec(source, namespace, namespace)
     return namespace
 
 
