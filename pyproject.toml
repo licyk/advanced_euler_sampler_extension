@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui-advanced-euler-sampler-extension"
+version = "0.1.0"
+description = "ComfyUI custom node pack that registers advanced Euler and pyramid-noise samplers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "azazeal04" }
+]
+keywords = ["ComfyUI", "custom-nodes", "sampler", "k-diffusion", "stable-diffusion"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+dependencies = [
+  "torch",
+  "tqdm"
+]
+
+[tool.setuptools]
+py-modules = ["__init__"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"" = ["scripts/*.py", "img/*.jpg"]
+
+[project.urls]
+"Homepage" = "https://github.com/azazeal04/Comfyui_advanced_euler_sampler_extension"
+"Bug Tracker" = "https://github.com/azazeal04/Comfyui_advanced_euler_sampler_extension/issues"
